@@ -212,6 +212,7 @@ jobs:
       - name: run benchmarks
         shell: bash
         env:
+          DVC_TEST_AZURE_PATH: 'az://dvc-bench-ci'
           DVC_TEST_AZURE_CONNECTION_STRING: ${{ secrets.TEST_CONNECTION_STRING }}
         run: |
           pytest --benchmark-save ${{ matrix.test.name}} --benchmark-group-by func --dvc-revs ${CLOUD_REVS} --dvc-install-deps azure --pyargs ${{ matrix.test.path }} dvc_azure.tests.benchmarks --size ${DATASET}
