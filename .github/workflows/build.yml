@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - azure-test
   schedule:
     - cron: '0 0 * * *'
 
@@ -31,124 +32,124 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - name: install requirements
-        run: |
-          pip install -U pip
-          pip install wheel
-          pip install -r requirements.txt
-      - name: check project styling
-        run: pre-commit run --all-files --show-diff-on-failure
-  gen:
-    runs-on: ubuntu-latest
-    outputs:
-      tests: ${{ steps.tests.outputs.tests }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - name: install reqs
-        run: |
-          pip install -U pip
-          pip install -r requirements.txt
-          pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-      - id: tests
-        run: echo "tests=$(./scripts/ci/list_tests.sh)" >> $GITHUB_OUTPUT
-  build:
-    needs: [gen]
-    timeout-minutes: 180
-    name: run ${{ matrix.test.name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        test: ${{fromJson(needs.gen.outputs.tests)}}
-    steps:
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - uses: actions/checkout@v3
-      - name: install requirements
-        run: |
-            pip install -r requirements.txt
-            pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-      - name: run benchmarks
-        shell: bash
-        env:
-          DVC_BENCH_AZURE_CONN_STR: ${{ secrets.DVC_BENCH_AZURE_CONN_STR }}
-        run: pytest --benchmark-save ${{ matrix.test.name }} --benchmark-group-by func --dvc-revs ${DVC_REVS} --pyargs ${{ matrix.test.path }} --size ${DATASET}
-      - name: upload raw results
-        uses: actions/upload-artifact@v3
-        with:
-          name: .benchmarks
-          path: .benchmarks
+  # lint:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - name: install requirements
+  #       run: |
+  #         pip install -U pip
+  #         pip install wheel
+  #         pip install -r requirements.txt
+  #     - name: check project styling
+  #       run: pre-commit run --all-files --show-diff-on-failure
+  # gen:
+  #   runs-on: ubuntu-latest
+  #   outputs:
+  #     tests: ${{ steps.tests.outputs.tests }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - name: install reqs
+  #       run: |
+  #         pip install -U pip
+  #         pip install -r requirements.txt
+  #         pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #     - id: tests
+  #       run: echo "tests=$(./scripts/ci/list_tests.sh)" >> $GITHUB_OUTPUT
+  # build:
+  #   needs: [gen]
+  #   timeout-minutes: 180
+  #   name: run ${{ matrix.test.name }}
+  #   runs-on: ${{ matrix.os }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: [ubuntu-latest]
+  #       test: ${{fromJson(needs.gen.outputs.tests)}}
+  #   steps:
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - uses: actions/checkout@v3
+  #     - name: install requirements
+  #       run: |
+  #           pip install -r requirements.txt
+  #           pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #     - name: run benchmarks
+  #       shell: bash
+  #       env:
+  #         DVC_BENCH_AZURE_CONN_STR: ${{ secrets.DVC_BENCH_AZURE_CONN_STR }}
+  #       run: pytest --benchmark-save ${{ matrix.test.name }} --benchmark-group-by func --dvc-revs ${DVC_REVS} --pyargs ${{ matrix.test.path }} --size ${DATASET}
+  #     - name: upload raw results
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: .benchmarks
+  #         path: .benchmarks
 
-  gen_s3:
-    runs-on: ubuntu-latest
-    outputs:
-      tests: ${{ steps.tests.outputs.tests }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - name: install reqs
-        run: |
-          pip install -U pip
-          pip install -r requirements.txt
-          pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-          pip install "dvc_s3[tests] @ git+https://github.com/iterative/dvc-s3"
-      - id: tests
-        run: echo "tests=$(./scripts/ci/list_tests_cloud.sh s3)" >> $GITHUB_OUTPUT
+  # gen_s3:
+  #   runs-on: ubuntu-latest
+  #   outputs:
+  #     tests: ${{ steps.tests.outputs.tests }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - name: install reqs
+  #       run: |
+  #         pip install -U pip
+  #         pip install -r requirements.txt
+  #         pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #         pip install "dvc_s3[tests] @ git+https://github.com/iterative/dvc-s3"
+  #     - id: tests
+  #       run: echo "tests=$(./scripts/ci/list_tests_cloud.sh s3)" >> $GITHUB_OUTPUT
 
-  build_s3:
-    needs: [gen_s3]
-    strategy:
-      fail-fast: false
-      matrix:
-          test: ${{fromJson(needs.gen_s3.outputs.tests)}}
-    runs-on: ubuntu-latest
-    name: run ${{ matrix.test.name }}
-    timeout-minutes: 480
-    permissions:
-      id-token: write
-    steps:
-      - name: configure AWS credentials
-        if: ${{ github.event_name == 'schedule' }}
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::342840881361:role/dvc-bench-gha
-          role-duration-seconds: 28800
-          aws-region: us-east-1
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - uses: actions/checkout@v3
-      - name: install requirements
-        run: |
-            pip install -r requirements.txt
-            pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-            pip install "dvc-s3[tests] @ git+https://github.com/iterative/dvc-s3"
-      - name: configure real S3 DVC env
-        if: ${{ github.event_name == 'schedule' }}
-        run: |
-          echo "DVC_TEST_AWS_REPO_BUCKET=dvc-bench-ci" >> "$GITHUB_ENV"
-      - name: run benchmarks
-        shell: bash
-        run: pytest --benchmark-save ${{ matrix.test.name}} --benchmark-group-by func --dvc-revs ${CLOUD_REVS} --dvc-install-deps s3 --pyargs ${{ matrix.test.path }} dvc_s3.tests.benchmarks --size ${DATASET}
-      - name: upload raw results
-        uses: actions/upload-artifact@v3
-        with:
-          name: .benchmarks
-          path: .benchmarks
+  # build_s3:
+  #   needs: [gen_s3]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #         test: ${{fromJson(needs.gen_s3.outputs.tests)}}
+  #   runs-on: ubuntu-latest
+  #   name: run ${{ matrix.test.name }}
+  #   timeout-minutes: 480
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - name: configure AWS credentials
+  #       if: ${{ github.event_name == 'schedule' }}
+  #       uses: aws-actions/configure-aws-credentials@v2
+  #       with:
+  #         role-to-assume: arn:aws:iam::342840881361:role/dvc-bench-gha
+  #         role-duration-seconds: 28800
+  #         aws-region: us-east-1
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - uses: actions/checkout@v3
+  #     - name: install requirements
+  #       run: |
+  #           pip install -r requirements.txt
+  #           pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #           pip install "dvc-s3[tests] @ git+https://github.com/iterative/dvc-s3"
+  #     - name: configure real S3 DVC env
+  #       if: ${{ github.event_name == 'schedule' }}
+  #       run: |
+  #         echo "DVC_TEST_AWS_REPO_BUCKET=dvc-bench-ci" >> "$GITHUB_ENV"
+  #     - name: run benchmarks
+  #       shell: bash
+  #       run: pytest --benchmark-save ${{ matrix.test.name}} --benchmark-group-by func --dvc-revs ${CLOUD_REVS} --dvc-install-deps s3 --pyargs ${{ matrix.test.path }} dvc_s3.tests.benchmarks --size ${DATASET}
+  #     - name: upload raw results
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: .benchmarks
+  #         path: .benchmarks
 
   gen_azure:
     runs-on: ubuntu-latest
@@ -210,6 +211,8 @@ jobs:
           echo "DVC_TEST_AZURE_PATH=az://dvc-bench-ci" >> $GITHUB_ENV
       - name: run benchmarks
         shell: bash
+        env:
+          DVC_TEST_AZURE_CONNECTION_STRING: ${{ secrets.TEST_CONNECTION_STRING }}
         run: |
           pytest --benchmark-save ${{ matrix.test.name}} --benchmark-group-by func --dvc-revs ${CLOUD_REVS} --dvc-install-deps azure --pyargs ${{ matrix.test.path }} dvc_azure.tests.benchmarks --size ${DATASET}
       - name: upload raw results
@@ -218,103 +221,103 @@ jobs:
           name: .benchmarks
           path: .benchmarks
 
-  gen_gs:
-    runs-on: ubuntu-latest
-    outputs:
-      tests: ${{ steps.tests.outputs.tests }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - name: install reqs
-        run: |
-          pip install -U pip
-          pip install -r requirements.txt
-          pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-          pip install "dvc-gs[tests] @ git+https://github.com/iterative/dvc-gs"
-      - id: tests
-        run: echo "tests=$(./scripts/ci/list_tests_cloud.sh gs)" >> $GITHUB_OUTPUT
+  # gen_gs:
+  #   runs-on: ubuntu-latest
+  #   outputs:
+  #     tests: ${{ steps.tests.outputs.tests }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - name: install reqs
+  #       run: |
+  #         pip install -U pip
+  #         pip install -r requirements.txt
+  #         pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #         pip install "dvc-gs[tests] @ git+https://github.com/iterative/dvc-gs"
+  #     - id: tests
+  #       run: echo "tests=$(./scripts/ci/list_tests_cloud.sh gs)" >> $GITHUB_OUTPUT
 
-  build_gs:
-    needs: [gen_gs]
-    strategy:
-      fail-fast: false
-      matrix:
-          test: ${{fromJson(needs.gen_gs.outputs.tests)}}
-    runs-on: ubuntu-latest
-    name: run ${{ matrix.test.name }}
-    timeout-minutes: 480
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/setup-python@v4
-        with:
-            python-version: "3.10"
-      - uses: actions/checkout@v3
-      - id: 'auth'
-        if: ${{ github.event_name == 'schedule' }}
-        name: 'Authenticate to GCP'
-        uses: 'google-github-actions/auth@v1.1.1'
-        with:
-          create_credentials_file: true
-          workload_identity_provider: 'projects/385088528371/locations/global/workloadIdentityPools/iterative-sandbox/providers/github'
-          service_account: 'dvc-bench@iterative-sandbox.iam.gserviceaccount.com'
-      - name: install requirements
-        run: |
-            pip install -r requirements.txt
-            pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-            pip install "dvc-gs[tests] @ git+https://github.com/iterative/dvc-gs"
-      - name: configure real GS DVC env
-        if: ${{ github.event_name == 'schedule' }}
-        run: |
-          echo "DVC_TEST_GS_BUCKET=dvc-bench" >> "$GITHUB_ENV"
-      - name: run benchmarks
-        shell: bash
-        run: pytest --benchmark-save ${{ matrix.test.name}} --benchmark-group-by func --dvc-revs ${CLOUD_REVS} --dvc-install-deps gs --pyargs ${{ matrix.test.path }} dvc_gs.tests.benchmarks --size ${DATASET}
-      - name: upload raw results
-        uses: actions/upload-artifact@v3
-        with:
-          name: .benchmarks
-          path: .benchmarks
+  # build_gs:
+  #   needs: [gen_gs]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #         test: ${{fromJson(needs.gen_gs.outputs.tests)}}
+  #   runs-on: ubuntu-latest
+  #   name: run ${{ matrix.test.name }}
+  #   timeout-minutes: 480
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #           python-version: "3.10"
+  #     - uses: actions/checkout@v3
+  #     - id: 'auth'
+  #       if: ${{ github.event_name == 'schedule' }}
+  #       name: 'Authenticate to GCP'
+  #       uses: 'google-github-actions/auth@v1.1.1'
+  #       with:
+  #         create_credentials_file: true
+  #         workload_identity_provider: 'projects/385088528371/locations/global/workloadIdentityPools/iterative-sandbox/providers/github'
+  #         service_account: 'dvc-bench@iterative-sandbox.iam.gserviceaccount.com'
+  #     - name: install requirements
+  #       run: |
+  #           pip install -r requirements.txt
+  #           pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #           pip install "dvc-gs[tests] @ git+https://github.com/iterative/dvc-gs"
+  #     - name: configure real GS DVC env
+  #       if: ${{ github.event_name == 'schedule' }}
+  #       run: |
+  #         echo "DVC_TEST_GS_BUCKET=dvc-bench" >> "$GITHUB_ENV"
+  #     - name: run benchmarks
+  #       shell: bash
+  #       run: pytest --benchmark-save ${{ matrix.test.name}} --benchmark-group-by func --dvc-revs ${CLOUD_REVS} --dvc-install-deps gs --pyargs ${{ matrix.test.path }} dvc_gs.tests.benchmarks --size ${DATASET}
+  #     - name: upload raw results
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: .benchmarks
+  #         path: .benchmarks
 
-  publish:
-    name: join results and publish
-    needs: [build, build_s3, build_azure, build_gs]
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      pull-requests: write
-      contents: write
-      id-token: write
-    steps:
-      - uses: iterative/setup-cml@v1
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-      - uses: actions/checkout@v3
-      - name: install requirements
-        run: |
-          pip install -U pip
-          pip install -r requirements.txt
-          pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
-      - name: download ubuntu results
-        uses: actions/download-artifact@v3
+  # publish:
+  #   name: join results and publish
+  #   needs: [build, build_s3, build_azure, build_gs]
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     pages: write
+  #     pull-requests: write
+  #     contents: write
+  #     id-token: write
+  #   steps:
+  #     - uses: iterative/setup-cml@v1
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.10"
+  #     - uses: actions/checkout@v3
+  #     - name: install requirements
+  #       run: |
+  #         pip install -U pip
+  #         pip install -r requirements.txt
+  #         pip install "dvc[testing] @ git+https://github.com/iterative/dvc"
+  #     - name: download ubuntu results
+  #       uses: actions/download-artifact@v3
 
-      - name: compare results
-        shell: bash
-        run: ./scripts/ci/gen_html.sh
+  #     - name: compare results
+  #       shell: bash
+  #       run: ./scripts/ci/gen_html.sh
 
-      - name: post comment
-        env:
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: ${{ github.event_name == 'pull_request' && ! github.event.pull_request.head.repo.fork }}
-        run: |
-          cml comment update --watermark-title='dvc-bench report' report.md
+  #     - name: post comment
+  #       env:
+  #         REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       if: ${{ github.event_name == 'pull_request' && ! github.event.pull_request.head.repo.fork }}
+  #       run: |
+  #         cml comment update --watermark-title='dvc-bench report' report.md
 
-      - name: deploy new benchmarks to github pages
-        if: ${{ github.event_name == 'schedule' }}
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: html
+  #     - name: deploy new benchmarks to github pages
+  #       if: ${{ github.event_name == 'schedule' }}
+  #       uses: peaceiris/actions-gh-pages@v3
+  #       with:
+  #         github_token: ${{ secrets.GITHUB_TOKEN }}
+  #         publish_dir: html
